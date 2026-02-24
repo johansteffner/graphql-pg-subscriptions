@@ -10,6 +10,7 @@ interface PostgresPubSubOptions extends ClientConfig {
     commonMessageHandler?: (message: any) => any;
     client?: Client;
     maxListeners?: number;
+    usePayloadTable?: boolean;
 }
 
 class PostgresPubSub extends PubSubEngine {
@@ -18,9 +19,16 @@ class PostgresPubSub extends PubSubEngine {
     private subscriptions: { [key: number]: [string, (message: any) => void] };
     private subIdCounter: number;
     private commonMessageHandler: (message: any) => any;
+    private usePayloadTable: boolean;
 
     constructor(options: PostgresPubSubOptions = {}) {
-        const { commonMessageHandler, client, maxListeners = 15, ...pgOptions } = options;
+        const {
+            commonMessageHandler,
+            client,
+            maxListeners = 15,
+            usePayloadTable = true,
+            ...pgOptions
+        } = options;
         super();
         this.client = client || new Client(pgOptions);
         if (!client) {
@@ -31,7 +39,10 @@ class PostgresPubSub extends PubSubEngine {
         this.subscriptions = {};
         this.subIdCounter = 0;
         this.commonMessageHandler = commonMessageHandler || defaultCommonMessageHandler;
-        this.ensureTableExists();
+        this.usePayloadTable = usePayloadTable;
+        if (this.usePayloadTable) {
+            this.ensureTableExists();
+        }
     }
 
     private async ensureTableExists() {
@@ -46,6 +57,10 @@ class PostgresPubSub extends PubSubEngine {
     }
 
     async publish(triggerName: string, payload: any): Promise<void> {
+        if (!this.usePayloadTable) {
+            return this.ee.notify(triggerName, payload);
+        }
+
         const payloadString = JSON.stringify(payload);
         const result = await this.client.query(
             `INSERT INTO pubsub_payloads (trigger, payload) VALUES ($1, $2) RETURNING id`,
@@ -80,7 +95,8 @@ class PostgresPubSub extends PubSubEngine {
             this.ee,
             triggers,
             this.commonMessageHandler,
-            this.client
+            this.client,
+            this.usePayloadTable
         ) as any;
     }
 }

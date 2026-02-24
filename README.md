@@ -16,7 +16,7 @@ This package implements the PubSubEngine Interface from the graphql-subscription
 # Features
 - Properly Maintained
 - Small In Size
-- Larger Payload Problem Solved (I use pg table for the payload. So now larger payload can pass) - (PG Default Notify has size limit, that's why you can't provide larger payload.);
+- Larger Payload Problem Solved (optional pg table for payloads via `usePayloadTable`, since PG NOTIFY has a size limit);
 - Fully TypeScript Support
 - Worked with any framework (ExpressJS, NestJS)
 
@@ -54,9 +54,12 @@ const client = new Client({
 
 client.connect();
 
-const pubsub = new PostgresPubSub({ client, maxListeners: 15 });
+const pubsub = new PostgresPubSub({ client, maxListeners: 15, usePayloadTable: true });
 
 //You can increase max event listeners if you need, default is 15
+
+//usePayloadTable enables storing payloads in Postgres for large messages.
+//If set to false, payloads are sent directly via NOTIFY (size limits apply).
 ```
 
 ### commonMessageHandler
