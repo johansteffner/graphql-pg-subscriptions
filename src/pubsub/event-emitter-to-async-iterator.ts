@@ -8,7 +8,8 @@ function eventEmitterAsyncIterator<T>(
     eventEmitter: EventEmitter,
     eventsNames: string | string[],
     commonMessageHandler: MessageHandler<T> = message => message,
-    client: Client
+    client: Client,
+    usePayloadTable: boolean
 ) {
     const pullQueue: Array<(value: IteratorResult<any>) => void> = [];
     const pushQueue: any[] = [];
@@ -16,6 +17,16 @@ function eventEmitterAsyncIterator<T>(
     let listening = true;
 
     const pushValue = async ({ payload: event }: { payload: T }) => {
+        if (!usePayloadTable) {
+            const value = commonMessageHandler(event);
+            if (pullQueue.length !== 0) {
+                pullQueue.shift()!({ value, done: false });
+            } else {
+                pushQueue.push(value);
+            }
+            return;
+        }
+
         const query = `SELECT payload FROM pubsub_payloads WHERE id = $1`;
         const res = await client.query(query, [event]);
         const value = commonMessageHandler(res.rows[0].payload);
